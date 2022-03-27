@@ -86,3 +86,18 @@ The code given is structured as follows. Feel free however to modify the structu
 * [Sqlite3](https://sqlite.org/index.html) - Database storage engine
 
 Happy hacking 😁!
+
+## Developer Section
+- The initial use case that caught my mind was invoice volumes that we might be fetching from the database
+Thinking this into consideration, I have decided on a solution to fetch PENDING invoices based on the currency.
+- A thread pool is created with size based on the currency file and pending invoices are retrieved.
+- I have given a long thought to decide about the way the external payment implementation i was considering the tradeoff 
+between using a REST call and MQ/Apache kafka based system.
+- The reason for not using REST for external payment system in this scenario is that, the users are not waiting for a Response immediately
+so the thought of sending the Invoices to a Queue / kafka based system made sense.
+- At this point we are interested in charging the customer and how we are going to implement the retry mechanism
+and how the user/Pleo team is going to be intimated about the success /failure of payment.
+- I am thinking of building an Engine based system for the external charging implementation
+- ``Curreny Engine`` - This Engine is going to be responsible for handling of payments happening for that particular currency.
+
+
