@@ -8,8 +8,11 @@ import io.pleo.antaeus.core.exceptions.InvoiceNotFoundException
 import io.pleo.antaeus.data.AntaeusDal
 import io.pleo.antaeus.models.Currency
 import io.pleo.antaeus.models.Invoice
+import mu.KotlinLogging
 
 class InvoiceService(private val dal: AntaeusDal) {
+    private val logger = KotlinLogging.logger {}
+
     fun fetchAll(): List<Invoice> {
         return dal.fetchInvoices()
     }
@@ -19,6 +22,7 @@ class InvoiceService(private val dal: AntaeusDal) {
     }
 
     fun fetchPendingInvoices(currency: Currency) :List<Invoice> {
-            return dal.fetchInvoices(currency)
+        logger.info ("Fetching Pending invoices for $currency" )
+        return dal.fetchInvoices(currency)
         }
 }
