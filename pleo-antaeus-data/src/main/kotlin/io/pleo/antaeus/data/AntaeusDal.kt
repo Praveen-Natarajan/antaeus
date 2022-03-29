@@ -103,4 +103,12 @@ class AntaeusDal(private val db: Database) {
         }
     }
 
+    fun fetchFailedInvoices(currency: Currency): List<Invoice> {
+        return transaction(db) {
+            InvoiceTable
+                    .select { (InvoiceTable.currency.eq(currency.name)) and (InvoiceTable.status.eq(InvoiceStatus.FAILED.name)) }
+                    .map { it.toInvoice() }
+        }
+    }
+
 }
