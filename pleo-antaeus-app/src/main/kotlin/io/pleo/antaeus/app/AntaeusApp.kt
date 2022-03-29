@@ -8,10 +8,7 @@
 package io.pleo.antaeus.app
 
 import getPaymentProvider
-import io.pleo.antaeus.core.services.BillingService
-import io.pleo.antaeus.core.services.CustomerService
-import io.pleo.antaeus.core.services.InvoiceService
-import io.pleo.antaeus.core.services.KafkaService
+import io.pleo.antaeus.core.services.*
 import io.pleo.antaeus.data.AntaeusDal
 import io.pleo.antaeus.data.CustomerTable
 import io.pleo.antaeus.data.InvoiceTable
@@ -68,13 +65,12 @@ fun main() {
     val billingService = BillingService(paymentProvider = paymentProvider, invoiceService = invoiceService,
             kafkaService = kafkaservice, customerService = customerService)
 
-
+    val schedulerService = SchedulerService(invoiceService = invoiceService)
 
     // Create REST web service
     AntaeusRest(
         invoiceService = invoiceService,
         customerService = customerService,
-        billingService = billingService,
-        kafkaservice = kafkaservice
+        billingService = billingService
     ).run()
 }
