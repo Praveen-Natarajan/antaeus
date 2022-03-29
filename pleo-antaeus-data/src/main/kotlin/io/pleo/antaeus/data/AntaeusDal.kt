@@ -86,4 +86,21 @@ class AntaeusDal(private val db: Database) {
                     .map { it.toInvoice() }
         }
     }
+
+    fun updateInvoice(id: Int, status: InvoiceStatus) {
+        transaction(db){
+            InvoiceTable.update({InvoiceTable.id eq id }){
+                it[this.status] = status.name
+            }
+        }
+    }
+
+    fun fetchPaidInvoices(currency: Currency): List<Invoice> {
+        return transaction(db) {
+            InvoiceTable
+                    .select { (InvoiceTable.currency.eq(currency.name)) and (InvoiceTable.status.eq(InvoiceStatus.PAID.name)) }
+                    .map { it.toInvoice() }
+        }
+    }
+
 }
