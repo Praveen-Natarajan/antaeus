@@ -87,6 +87,7 @@ The code given is structured as follows. Feel free however to modify the structu
 
 Happy hacking 😁!
 
+<<<<<<< HEAD
 ## Developer Section
 - The initial use case that caught my mind was invoice volumes that we might be fetching from the database
 Thinking this into consideration, I have decided on a solution to fetch PENDING invoices based on the currency.
@@ -99,5 +100,3 @@ so the thought of sending the Invoices to a Queue / kafka based system made sens
 and how the user/Pleo team is going to be intimated about the success /failure of payment.
 - I am thinking of building an Engine based system for the external charging implementation
 - ``Curreny Engine`` - This Engine is going to be responsible for handling of payments happening for that particular currency.
-
-
