@@ -1,4 +1,13 @@
 package io.pleo.antaeus.core.services
 
-class SchedulerService {
+import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledExecutorService
+
+class SchedulerService() {
+
+    private val invoiceScheduler : ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
+
+    Runnable process = () -> {
+
+    }
 }
