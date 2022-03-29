@@ -33,7 +33,13 @@ class InvoiceService(private val dal: AntaeusDal) {
     }
 
     fun fetchPaidInvoices(currency: Currency) :List<Invoice> {
-        logger.info ("Fetching Pending invoices for $currency" )
+        logger.info ("Fetching paid invoices for $currency" )
         return dal.fetchPaidInvoices(currency)
+    }
+
+
+    fun fetchFailedInvoices(currency: Currency) :List<Invoice> {
+        logger.info ("Fetching Failed invoices for $currency" )
+        return dal.fetchInvoices(currency)
     }
 }
