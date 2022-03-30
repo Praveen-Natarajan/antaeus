@@ -62,5 +62,3 @@ class SchedulerService(private val invoiceService: InvoiceService, private val b
         return (dayOfMonth.timeInMillis - Calendar.getInstance().timeInMillis)
     }
 }
-
-}
