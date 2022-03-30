@@ -65,7 +65,7 @@ fun main() {
     val billingService = BillingService(paymentProvider = paymentProvider, invoiceService = invoiceService,
             kafkaService = kafkaservice, customerService = customerService)
 
-    SchedulerService(invoiceService = invoiceService, billingService = billingService).scheduleTasks()
+    SchedulerService(billingService = billingService).scheduleTasks()
 
     // Create REST web service
     AntaeusRest(
