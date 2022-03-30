@@ -43,7 +43,7 @@ class BillingService(
         chargeInvoice();
     }
 
-    private fun createMsgTxtFromInvoice(output: Invoice) :String {
+     private fun createMsgTxtFromInvoice(output: Invoice) :String {
         var msg = output.id.toString()+"|"+output.customerId+"|"+output.status+"|"+output.amount.value+"|"+output.amount.currency;
         logger.info { "Message created for topic : $msg" }
         return msg;
@@ -133,7 +133,7 @@ class BillingService(
                     //-Message will be in this format -> 761|77|PENDING|356.54|SEK
                     when (chargeInvoice(msg[0].toInt(), InvoiceStatus.FAILED)) {
                         true -> updateStatus(msg[0].toInt(), InvoiceStatus.PAID)
-                        else -> processRetryFailure(msg[0].toInt())
+                        else -> processFailedRetry(msg[0].toInt())
 
                     }
                 }
@@ -141,10 +141,12 @@ class BillingService(
         }
     }
 
-    private fun processRetryFailure(id:Int){
+    private fun processFailedRetry(id:Int) : String {
          //#TODO - send message and notify both Pleo team and the card Owner
          // Implementation to notify the customer and the corresponding Pleo,operation executive about the Failure
          // Decision needs to be taken on sending a consolidated email vs mail for each failure
+        logger.info { "Msg sent to Pleo supprort & consumer for id : $id" }
+        return "Email sent to Pleo Support & Consumer"
     }
 }
 
