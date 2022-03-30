@@ -11,13 +11,13 @@ class SchedulerService(private val billingService: BillingService) {
     private val logger = KotlinLogging.logger {}
 
     fun scheduleTasks() {
-        processInvoices()  // process pending records from database and send to Topic
-        chargeInvoice()   //  start Kafka consumer and do the actual charging part
-        retryFailedInvoices()  // Start the retry consumer and do a retry
+        processInvoice()  // process pending records from database and send to Topic
+        processPendingInvoice()   //  start Kafka consumer and do the actual charging part
+        Processretry()  // Start the retry consumer and do a retry
     }
 
     //Advantage of using executor service is that it will handle the next run, even if the previous run failed
-    private fun processInvoices() {
+    private fun processInvoice() {
         val executorService = Executors.newSingleThreadScheduledExecutor()
         try {
             executorService.scheduleAtFixedRate({
@@ -28,7 +28,7 @@ class SchedulerService(private val billingService: BillingService) {
         }
     }
 
-    private fun retryFailedInvoices() {
+    private fun Processretry() {
         try {
             val executorService = Executors.newSingleThreadScheduledExecutor()
             executorService.scheduleWithFixedDelay({
@@ -40,11 +40,11 @@ class SchedulerService(private val billingService: BillingService) {
         }
     }
 
-    private fun chargeInvoice() {
+    private fun processPendingInvoice() {
         try {
             val executorService = Executors.newSingleThreadScheduledExecutor()
             executorService.scheduleWithFixedDelay({
-                billingService.chargeInvoice()
+                billingService.processPendingInvoice()
             }, 0, 2, TimeUnit.MINUTES)
             logger.info { "---charge Invoice kicked in ---" }
         } catch (e: java.lang.Exception) {

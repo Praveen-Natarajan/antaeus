@@ -39,17 +39,13 @@ class BillingService(
         logger.info { "All Invoices send for Processing" }
     }
 
-    fun consume(){
-        chargeInvoice();
-    }
-
      private fun createMsgTxtFromInvoice(output: Invoice) :String {
         var msg = output.id.toString()+"|"+output.customerId+"|"+output.status+"|"+output.amount.value+"|"+output.amount.currency;
         logger.info { "Message created for topic : $msg" }
         return msg;
     }
 
-    fun chargeInvoice() {
+    fun processPendingInvoice() {
         val consumer = kafkaService.createConsumer("localhost:9092")
         consumer.apply {
             subscribe(listOf(MY_PLEO_TOPIC))
@@ -100,7 +96,7 @@ class BillingService(
         return status
     }
 
-    fun test(){
+    fun getPaidInvoices(){
         Currency.values().sorted().forEach {
             val invoice = invoiceService.fetchPaidInvoices(it)
             for(invoice in invoice)
@@ -108,7 +104,7 @@ class BillingService(
         }
     }
 
-    fun pendingtest(){
+    fun getFailedInvoices(){
         Currency.values().sorted().forEach {
             val output : List<Invoice> = invoiceService.fetchFailedInvoices(it)
             output.forEach {
