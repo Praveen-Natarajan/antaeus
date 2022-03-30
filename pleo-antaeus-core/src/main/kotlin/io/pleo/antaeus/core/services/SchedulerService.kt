@@ -6,7 +6,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 
-class SchedulerService(private val invoiceService: InvoiceService, private val billingService: BillingService) {
+class SchedulerService(private val billingService: BillingService) {
 
     private val logger = KotlinLogging.logger {}
 
@@ -46,7 +46,7 @@ class SchedulerService(private val invoiceService: InvoiceService, private val b
             executorService.scheduleWithFixedDelay({
                 billingService.chargeInvoice()
             }, 0, 2, TimeUnit.MINUTES)
-            logger.info { "---Retry mechanism kicked in ---" }
+            logger.info { "---charge Invoice kicked in ---" }
         } catch (e: java.lang.Exception) {
             logger.error { "process Failed invoices Task Failed ${e.localizedMessage}" }
         }
