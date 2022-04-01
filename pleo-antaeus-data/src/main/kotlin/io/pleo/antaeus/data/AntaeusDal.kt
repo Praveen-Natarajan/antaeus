@@ -7,14 +7,12 @@
 
 package io.pleo.antaeus.data
 
-import io.pleo.antaeus.models.Currency
-import io.pleo.antaeus.models.Customer
-import io.pleo.antaeus.models.Invoice
-import io.pleo.antaeus.models.InvoiceStatus
-import io.pleo.antaeus.models.Money
+import io.pleo.antaeus.models.*
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.joda.time.DateTime
+import java.time.LocalDateTime
 
 class AntaeusDal(private val db: Database) {
     fun fetchInvoice(id: Int): Invoice? {
@@ -108,6 +106,25 @@ class AntaeusDal(private val db: Database) {
             InvoiceTable
                     .select { (InvoiceTable.currency.eq(currency.name)) and (InvoiceTable.status.eq(InvoiceStatus.FAILED.name)) }
                     .map { it.toInvoice() }
+        }
+    }
+
+    fun updateAuditTable(id:Int, fromStatus: InvoiceStatus, toStatus: InvoiceStatus){
+        return transaction (db) {
+            AuditTable.insert {
+                it[this.id] = id
+                it[this.fromstatus] = fromStatus.toString()
+                it[this.tostatus] = toStatus.toString()
+                it[this.timestamp] = DateTime.now()
+            }
+        }
+    }
+
+    fun fetchAuditInfo(): List<Audit> {
+        return transaction(db) {
+            AuditTable
+                    .selectAll()
+                    .map { it.toAudit() }
         }
     }
 
