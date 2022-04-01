@@ -81,28 +81,28 @@ class AntaeusRest(
                     }
 
                     path("billing") {
-                        //URL: /rest/v1/foreach
+                        //URL: /rest/v1/billing/processInvoice
                         get("processInvoice") {
                             it.json(billingService.processInvoices())
                         }
                     }
 
                     path("billing") {
-                        //URL: /rest/v1/consume
+                        //URL: /rest/v1/billing/chargeInvoice
                         get("chargeInvoice") {
                             it.json(billingService.processPendingInvoice())
                         }
                     }
 
                     path("billing") {
-                        //URL: /rest/v1/consume
+                        //URL: /rest/v1/billing/getPaidInvoice
                         get("getPaidInvoice") {
                             it.json(billingService.getPaidInvoices())
                         }
                     }
 
                     path("billing") {
-                        //URL: /rest/v1/consume
+                        //URL: /rest/v1/billing/getPendingInvoice
                         get("getPendingInvoice") {
                             it.json(billingService.getFailedInvoices())
                         }

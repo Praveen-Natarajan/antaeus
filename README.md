@@ -106,3 +106,7 @@ and how the user/Pleo team is going to be intimated about the success /failure o
 ![img.png](img.png)
 
 
+## High Volume Transaction Proposed Design :
+
+![HighVolumeTransactionProposedDesign.png](HighVolumeTransactionProposedDesign.png)
+
