@@ -17,7 +17,6 @@ class BillingServiceTest {
     private val customerService = mockk<CustomerService>()
     private val Kafkaservice = mockk<KafkaService>()
 
-
     private val invoice = Invoice(23, 23, Money(BigDecimal.valueOf(1000), Currency.EUR), InvoiceStatus.PENDING)
 
     private val customer = Customer(
@@ -100,10 +99,7 @@ class BillingServiceTest {
         assertEquals(null , method.invoke(billingService, *parameters) )
     }
 
-    @Test
-    fun `Retry Invoices that failed the first time` (){
 
-    }
 
 
 
