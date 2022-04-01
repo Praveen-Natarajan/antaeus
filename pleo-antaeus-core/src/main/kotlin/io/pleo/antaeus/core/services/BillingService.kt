@@ -1,13 +1,13 @@
 package io.pleo.antaeus.core.services
 
-import io.pleo.antaeus.core.MY_PLEO_TOPIC
+import io.pleo.antaeus.core.MY_INVOICE_TOPIC
 import io.pleo.antaeus.core.MY_RETRY_TOPIC
 import io.pleo.antaeus.core.external.PaymentProvider
+import io.pleo.antaeus.models.Audit
 import io.pleo.antaeus.models.Currency
 import io.pleo.antaeus.models.Invoice
 import io.pleo.antaeus.models.InvoiceStatus
 import mu.KotlinLogging
-import java.time.Duration
 import java.util.concurrent.Executors
 
 class BillingService(
@@ -27,7 +27,7 @@ class BillingService(
             output.forEach {
                 try {
                     logger.info ("processing message $it " )
-                    kafkaService.sendMessage(createMsgTxtFromInvoice(it),it.amount.currency.name, MY_PLEO_TOPIC)
+                    kafkaService.sendMessage(createMsgTxtFromInvoice(it),it.amount.currency.name, MY_INVOICE_TOPIC)
                 } catch(e : Exception) {
                     logger.error { "Error sending messages to the topic for $it" }
                 }
@@ -46,31 +46,23 @@ class BillingService(
     }
 
     fun processPendingInvoice() {
-        val consumer = kafkaService.createConsumer("localhost:9092")
-        consumer.apply {
-            subscribe(listOf(MY_PLEO_TOPIC))
-        }
-        consumer.use {
-            while (true) {
-                val records = consumer.poll(Duration.ofMillis(1000))
-                records.forEach {
-                    logger.info ("$it")
-                    var msg = it.value().toString().split("|")
-                    //-Message will be in this format -> 761|77|PENDING|356.54|SEK
-                    logger.info ("Message received : $msg")
-                    when (chargeInvoice(msg[0].toInt(), InvoiceStatus.PENDING)) {
-                        true -> updateStatus(msg[0].toInt(), InvoiceStatus.PAID)
-                        else -> processRetry(invoiceService.fetch(msg[0].toInt()), InvoiceStatus.FAILED)
+        logger.info { "--process Invoice Mechanism kicked in, processing invoice messages" }
+        kafkaService.consumeInvoiceMessage()?.forEach {
+            logger.info("$it")
+            var msg = it.value().toString().split("|")
+            //-Message will be in this format -> 761|77|PENDING|356.54|SEK
+            logger.info("Message received : $msg")
+            when (chargeInvoice(msg[0].toInt(), InvoiceStatus.PENDING)) {
+                true -> updateStatus(msg[0].toInt(), InvoiceStatus.PAID)
+                else -> processRetry(invoiceService.fetch(msg[0].toInt()), InvoiceStatus.FAILED)
 
-                    }
-                }
             }
         }
     }
 
     private fun processRetry(invoice: Invoice, status: InvoiceStatus) {
         updateStatus(invoice.id, InvoiceStatus.FAILED)
-        logger.info { "sending message for retry $invoice to topic: $MY_RETRY_TOPIC" }
+        logger.info { "sending message for retry $invoice to topic: $MY_RETRY_TOPIC & status : $status" }
         //Send Msg to new Topic to process Failure status, which will be invoked Separately
         kafkaService.sendMessage(createMsgTxtFromInvoice(invoice),invoice.amount.currency.name, MY_RETRY_TOPIC)
     }
@@ -87,6 +79,11 @@ class BillingService(
                 if (invoice.status == invoiceStatus && customer.currency == invoice.amount.currency) {
                     status = paymentProvider.charge(invoice)
                 }
+                if (status) {
+                    invoiceService.createAudit(id, invoiceStatus, InvoiceStatus.PAID)
+                } else {
+                    invoiceService.createAudit(id, invoiceStatus, InvoiceStatus.FAILED)
+                }
             } catch (e: Exception) {
                 logger.error(e) { "Payment failed for invoice ${id}" }
             }
@@ -95,43 +92,42 @@ class BillingService(
         return status
     }
 
-    fun getPaidInvoices(){
+    fun getPaidInvoices(): MutableList<Any> {
+        var mutableListAny: MutableList<Any> = mutableListOf<Any>()
         Currency.values().sorted().forEach {
-            val invoice = invoiceService.fetchPaidInvoices(it)
-            for(invoice in invoice)
-            logger.info { "paid invoices are $invoice" }
+            val output: List<Invoice> = invoiceService.fetchPaidInvoices(it)
+            output.forEach {
+                mutableListAny.add(it)
+                logger.info { "paid invoices are $it" }
+            }
         }
+        return mutableListAny
     }
 
-    fun getFailedInvoices(){
+    fun getFailedInvoices(): MutableList<Any> {
+        var mutableListAny: MutableList<Any> = mutableListOf<Any>()
         Currency.values().sorted().forEach {
             val output : List<Invoice> = invoiceService.fetchFailedInvoices(it)
             output.forEach {
+                mutableListAny.add(it)
                 logger.info { "Failed invoices are $it" }
             }
             logger.info { "Method completed" }
         }
+        return mutableListAny
     }
 
     fun retryInvoices(){
-        logger.info { "--Retry Mechanism kicked in, processing retry messages" }
-        val consumer = kafkaService.createConsumer("localhost:9092")
-        consumer.apply {
-            subscribe(listOf(MY_RETRY_TOPIC))
-        }
-        consumer.use {
-            while (true) {
-                val records = consumer.poll(Duration.ofMillis(1000))
-                records.forEach {
-                    logger.info { "Retrying payment for invoice: $it" }
-                    var msg = it.value().toString().split("|")
-                    //-Message will be in this format -> 761|77|PENDING|356.54|SEK
-                    when (chargeInvoice(msg[0].toInt(), InvoiceStatus.FAILED)) {
-                        true -> updateStatus(msg[0].toInt(), InvoiceStatus.PAID)
-                        else -> processFailedRetry(msg[0].toInt())
+        logger.info { "--Retry Mechanism kicked in, processing retry messages--" }
+        kafkaService.consumeRetryMessage()?.forEach{
+            logger.info("$it")
+            var msg = it.value().toString().split("|")
+            //-Message will be in this format -> 761|77|PENDING|356.54|SEK
+            logger.info("Message received : $msg")
+            when (chargeInvoice(msg[0].toInt(), InvoiceStatus.FAILED)) {
+                true -> updateStatus(msg[0].toInt(), InvoiceStatus.PAID)
+                else -> processFailedRetry(msg[0].toInt())
 
-                    }
-                }
             }
         }
     }
@@ -143,5 +139,11 @@ class BillingService(
         logger.info { "Msg sent to Pleo support & consumer for id : $id" }
         return "Email sent to Pleo Support & Consumer"
     }
+
+
+     fun getAuditInfo(): List<Audit> {
+        return invoiceService.fetchAuditTable()
+    }
+
 }
 
