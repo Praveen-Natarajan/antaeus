@@ -54,11 +54,10 @@ class BillingService(
             while (true) {
                 val records = consumer.poll(Duration.ofMillis(1000))
                 records.forEach {
-                    println("$it")
+                    logger.info ("$it")
                     var msg = it.value().toString().split("|")
                     //-Message will be in this format -> 761|77|PENDING|356.54|SEK
-                    println("$msg")
-                    println(msg[0]);
+                    logger.info ("Message received : $msg")
                     when (chargeInvoice(msg[0].toInt(), InvoiceStatus.PENDING)) {
                         true -> updateStatus(msg[0].toInt(), InvoiceStatus.PAID)
                         else -> processRetry(invoiceService.fetch(msg[0].toInt()), InvoiceStatus.FAILED)
