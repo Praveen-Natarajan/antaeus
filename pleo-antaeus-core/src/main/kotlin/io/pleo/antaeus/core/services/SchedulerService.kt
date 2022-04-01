@@ -46,7 +46,7 @@ class SchedulerService(private val billingService: BillingService) {
             executorService.scheduleWithFixedDelay({
                 billingService.processPendingInvoice()
             }, 0, 2, TimeUnit.MINUTES)
-            logger.info { "---charge Invoice kicked in ---" }
+            logger.info { "--- process pending Invoice kicked in ---" }
         } catch (e: java.lang.Exception) {
             logger.error { "process Failed invoices Task Failed ${e.localizedMessage}" }
         }
