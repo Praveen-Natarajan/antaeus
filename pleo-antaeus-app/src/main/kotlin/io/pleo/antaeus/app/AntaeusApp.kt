@@ -10,6 +10,7 @@ package io.pleo.antaeus.app
 import getPaymentProvider
 import io.pleo.antaeus.core.services.*
 import io.pleo.antaeus.data.AntaeusDal
+import io.pleo.antaeus.data.AuditTable
 import io.pleo.antaeus.data.CustomerTable
 import io.pleo.antaeus.data.InvoiceTable
 import io.pleo.antaeus.rest.AntaeusRest
@@ -25,7 +26,7 @@ import java.sql.Connection
 
 fun main() {
     // The tables to create in the database.
-    val tables = arrayOf(InvoiceTable, CustomerTable)
+    val tables = arrayOf(InvoiceTable, CustomerTable, AuditTable)
 
     val dbFile: File = File.createTempFile("antaeus-db", ".sqlite")
     // Connect to the database and create the needed tables. Drop any existing data.
