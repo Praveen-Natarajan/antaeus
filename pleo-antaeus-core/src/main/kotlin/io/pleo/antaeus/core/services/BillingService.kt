@@ -141,7 +141,7 @@ class BillingService(
          //#TODO - send message and notify both Pleo team and the card Owner
          // Implementation to notify the customer and the corresponding Pleo,operation executive about the Failure
          // Decision needs to be taken on sending a consolidated email vs mail for each failure
-        logger.info { "Msg sent to Pleo supprort & consumer for id : $id" }
+        logger.info { "Msg sent to Pleo support & consumer for id : $id" }
         return "Email sent to Pleo Support & Consumer"
     }
 }
