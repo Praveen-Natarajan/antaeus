@@ -6,6 +6,7 @@ import io.mockk.spyk
 import io.mockk.verify
 import io.pleo.antaeus.core.external.PaymentProvider
 import io.pleo.antaeus.data.AntaeusDal
+import io.pleo.antaeus.data.AuditTable
 import io.pleo.antaeus.models.*
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
@@ -59,7 +60,8 @@ class BillingServiceTest {
         parameters[1] = InvoiceStatus.PENDING
         every { invoiceService.fetch(any()) } returns invoice
         every { customerService.fetch(any()) } returns customer
-        verify(exactly = 0) { paymentProvider.charge(any()) }
+        every { paymentProvider.charge(any()) } returns false
+        every { invoiceService.createAudit(any(),any(),any()) } returns Unit
         assertEquals(false, method.invoke(billingService, *parameters))
     }
 
@@ -72,6 +74,7 @@ class BillingServiceTest {
         every { invoiceService.fetch(any()) } returns invoice
         every { paymentProvider.charge(any()) } returns true
         every { customerService.fetch(any()) } returns customer
+        every { invoiceService.createAudit(any(),any(),any()) } returns Unit
         assertEquals( billingService.chargeInvoice(23, InvoiceStatus.PENDING),true)
     }
 

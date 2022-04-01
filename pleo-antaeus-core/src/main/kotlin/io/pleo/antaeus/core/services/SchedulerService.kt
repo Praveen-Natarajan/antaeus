@@ -13,7 +13,7 @@ class SchedulerService(private val billingService: BillingService) {
     fun scheduleTasks() {
         processInvoice()  // process pending records from database and send to Topic
         processPendingInvoice()   //  start Kafka consumer and do the actual charging part
-        Processretry()  // Start the retry consumer and do a retry
+        processretry()  // Start the retry consumer and do a retry
     }
 
     //Advantage of using executor service is that it will handle the next run, even if the previous run failed
@@ -28,12 +28,12 @@ class SchedulerService(private val billingService: BillingService) {
         }
     }
 
-    private fun Processretry() {
+    private fun processretry() {
         try {
             val executorService = Executors.newSingleThreadScheduledExecutor()
             executorService.scheduleWithFixedDelay({
                 billingService.retryInvoices()
-            }, 1, 2, TimeUnit.MINUTES)
+            }, 0, 1, TimeUnit.MINUTES)
             logger.info { "---Retry mechanism kicked in ---" }
         } catch (e: java.lang.Exception) {
             logger.error { "process Failed invoices Task Failed ${e.localizedMessage}" }
@@ -45,7 +45,7 @@ class SchedulerService(private val billingService: BillingService) {
             val executorService = Executors.newSingleThreadScheduledExecutor()
             executorService.scheduleWithFixedDelay({
                 billingService.processPendingInvoice()
-            }, 0, 2, TimeUnit.MINUTES)
+            }, 0, 30, TimeUnit.SECONDS)
             logger.info { "--- process pending Invoice kicked in ---" }
         } catch (e: java.lang.Exception) {
             logger.error { "process Failed invoices Task Failed ${e.localizedMessage}" }
