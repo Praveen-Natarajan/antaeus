@@ -107,6 +107,13 @@ class AntaeusRest(
                             it.json(billingService.getFailedInvoices())
                         }
                     }
+
+                    path("billing") {
+                        //URL: /rest/v1/billing/getAudit
+                        get("getAudit") {
+                            it.json(billingService.getAuditInfo())
+                        }
+                    }
                 }
             }
         }
