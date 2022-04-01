@@ -2,6 +2,9 @@ package io.pleo.antaeus.core.services
 
 import io.pleo.antaeus.core.MY_INVOICE_TOPIC
 import io.pleo.antaeus.core.MY_RETRY_TOPIC
+import io.pleo.antaeus.core.exceptions.CurrencyMismatchException
+import io.pleo.antaeus.core.exceptions.InvoiceNotFoundException
+import io.pleo.antaeus.core.exceptions.NetworkException
 import io.pleo.antaeus.core.external.PaymentProvider
 import io.pleo.antaeus.models.Audit
 import io.pleo.antaeus.models.Currency
@@ -52,10 +55,19 @@ class BillingService(
             var msg = it.value().toString().split("|")
             //-Message will be in this format -> 761|77|PENDING|356.54|SEK
             logger.info("Message received : $msg")
-            when (chargeInvoice(msg[0].toInt(), InvoiceStatus.PENDING)) {
-                true -> updateStatus(msg[0].toInt(), InvoiceStatus.PAID)
-                else -> processRetry(invoiceService.fetch(msg[0].toInt()), InvoiceStatus.FAILED)
+            try {
 
+                when (chargeInvoice(msg[0].toInt(), InvoiceStatus.PENDING)) {
+                    true -> updateStatus(msg[0].toInt(), InvoiceStatus.PAID)
+                    else -> processRetry(invoiceService.fetch(msg[0].toInt()), InvoiceStatus.FAILED)
+
+                }
+            } catch (e: CurrencyMismatchException) {
+                logger.error { "processing message failed with CurrencyMismatchException::$msg[0] " }
+                //- Call notification service for Pleo & customer
+                //we aren't going to retry the currency mismatch one's as it will fail again
+            } catch (e: Exception) {
+                logger.error { "processing message failed::$msg[0]" }
             }
         }
     }
@@ -78,14 +90,28 @@ class BillingService(
                 val customer = customerService.fetch(invoice.customerId)
                 if (invoice.status == invoiceStatus && customer.currency == invoice.amount.currency) {
                     status = paymentProvider.charge(invoice)
+                } else {
+                    // - Fail faster and fail safe, instead of failing at external vendor level
+                    logger.error { "Currency Mismatch with the invoice::$invoice.id for Customer ${customer.id}" }
+                    throw CurrencyMismatchException(invoice.id, customer.id)
+                    //#TODO-Implementation to notify Pleo Production support
                 }
+                // - Update Audit table for Auditing Purposes
                 if (status) {
                     invoiceService.createAudit(id, invoiceStatus, InvoiceStatus.PAID)
                 } else {
                     invoiceService.createAudit(id, invoiceStatus, InvoiceStatus.FAILED)
                 }
+            } catch (e: InvoiceNotFoundException) {
+                logger.error(e) { "Invoice not found in the database InvoiceId:: ${id}" }
+                return false
+            } catch (e: NetworkException) {
+                logger.error(e) { "unable to charge due to network failure for Invoice:: ${id}" }
+                return false
             } catch (e: Exception) {
                 logger.error(e) { "Payment failed for invoice ${id}" }
+                return false
+
             }
 
         logger.info { "Payment status of invoice ${id} is: ${status}" }
