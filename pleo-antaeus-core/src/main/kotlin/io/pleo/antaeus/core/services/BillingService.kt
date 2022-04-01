@@ -12,12 +12,15 @@ import io.pleo.antaeus.models.Invoice
 import io.pleo.antaeus.models.InvoiceStatus
 import mu.KotlinLogging
 import java.util.concurrent.Executors
+import java.util.concurrent.locks.ReentrantReadWriteLock
 
 class BillingService(
     private val paymentProvider: PaymentProvider, private val invoiceService: InvoiceService,private val kafkaService: KafkaService,
     private val customerService: CustomerService
 ) {
     private val logger = KotlinLogging.logger {}
+    var rwlock:  ReentrantReadWriteLock = ReentrantReadWriteLock()
+
 
     fun processInvoices() {
     // create threadPool based on the currency Size
@@ -42,10 +45,15 @@ class BillingService(
         logger.info { "All Invoices send for Processing" }
     }
 
-     private fun createMsgTxtFromInvoice(output: Invoice) :String {
-        var msg = output.id.toString()+"|"+output.customerId+"|"+output.status+"|"+output.amount.value+"|"+output.amount.currency;
-        logger.info { "Message created for topic : $msg" }
-        return msg;
+    private fun createMsgTxtFromInvoice(output: Invoice): String {
+        rwlock.writeLock().lock()
+        try {
+            var msg = output.id.toString() + "|" + output.customerId + "|" + output.status + "|" + output.amount.value + "|" + output.amount.currency;
+            logger.info { "Message created for topic : $msg" }
+            return msg;
+        } finally {
+            rwlock.writeLock().unlock()
+        }
     }
 
     fun processPendingInvoice() {
@@ -56,11 +64,9 @@ class BillingService(
             //-Message will be in this format -> 761|77|PENDING|356.54|SEK
             logger.info("Message received : $msg")
             try {
-
                 when (chargeInvoice(msg[0].toInt(), InvoiceStatus.PENDING)) {
                     true -> updateStatus(msg[0].toInt(), InvoiceStatus.PAID)
                     else -> processRetry(invoiceService.fetch(msg[0].toInt()), InvoiceStatus.FAILED)
-
                 }
             } catch (e: CurrencyMismatchException) {
                 logger.error { "processing message failed with CurrencyMismatchException::$msg[0] " }
@@ -80,11 +86,20 @@ class BillingService(
     }
 
     private fun updateStatus(id: Int, status: InvoiceStatus) {
-        invoiceService.updateInvoice(id, status)
+        rwlock.writeLock().lock()
+        try {
+            invoiceService.updateInvoice(id, status)
+        }catch (e: Exception){
+            logger.error { "Error updating invoice status in the database" }
+        }finally {
+            rwlock.writeLock().unlock()
+        }
     }
 
     fun chargeInvoice(id: Int, invoiceStatus: InvoiceStatus): Boolean {
-        var status = false
+        rwlock.writeLock().lock()
+        try {
+            var status = false
             try {
                 val invoice = invoiceService.fetch(id) //Fetch and check to avoid double charge
                 val customer = customerService.fetch(invoice.customerId)
@@ -111,11 +126,13 @@ class BillingService(
             } catch (e: Exception) {
                 logger.error(e) { "Payment failed for invoice ${id}" }
                 return false
-
             }
 
-        logger.info { "Payment status of invoice ${id} is: ${status}" }
-        return status
+            logger.info { "Payment status of invoice ${id} is: ${status}" }
+            return status
+        }finally {
+            rwlock.writeLock().unlock()
+        }
     }
 
     fun getPaidInvoices(): MutableList<Any> {
