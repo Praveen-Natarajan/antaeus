@@ -53,7 +53,7 @@ class SchedulerService(private val billingService: BillingService) {
     }
 
     private fun getMilliseconds(): Long {
-        var dayOfMonth = Calendar.getInstance()
+        val dayOfMonth = Calendar.getInstance()
 
         if (dayOfMonth.get(Calendar.DAY_OF_MONTH) != 1) {
             dayOfMonth.add(Calendar.MONTH, 1)
