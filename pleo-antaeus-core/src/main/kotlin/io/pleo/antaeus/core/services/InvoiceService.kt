@@ -6,7 +6,6 @@ package io.pleo.antaeus.core.services
 
 import io.pleo.antaeus.core.exceptions.InvoiceNotFoundException
 import io.pleo.antaeus.data.AntaeusDal
-import io.pleo.antaeus.data.AuditTable
 import io.pleo.antaeus.models.Audit
 import io.pleo.antaeus.models.Currency
 import io.pleo.antaeus.models.Invoice
