@@ -19,7 +19,7 @@ class BillingService(
     private val customerService: CustomerService
 ) {
     private val logger = KotlinLogging.logger {}
-    var rwlock:  ReentrantReadWriteLock = ReentrantReadWriteLock()
+    private var readWriteLock:  ReentrantReadWriteLock = ReentrantReadWriteLock()
 
 
     fun processInvoices() {
@@ -46,27 +46,28 @@ class BillingService(
     }
 
     private fun createMsgTxtFromInvoice(output: Invoice): String {
-        rwlock.writeLock().lock()
+        readWriteLock.writeLock().lock()
         try {
-            var msg = output.id.toString() + "|" + output.customerId + "|" + output.status + "|" + output.amount.value + "|" + output.amount.currency;
+            val msg = output.id.toString() + "|" + output.customerId + "|" + output.status + "|" + output.amount.value + "|" + output.amount.currency
             logger.info { "Message created for topic : $msg" }
-            return msg;
+            return msg
         } finally {
-            rwlock.writeLock().unlock()
+            readWriteLock.writeLock().unlock()
         }
     }
 
+
+    //-Incoming Message will be in this format -> 761|77|PENDING|356.54|SEK
     fun processPendingInvoice() {
         logger.info { "--process Invoice Mechanism kicked in, processing invoice messages" }
         kafkaService.consumeInvoiceMessage()?.forEach {
             logger.info("$it")
-            var msg = it.value().toString().split("|")
-            //-Message will be in this format -> 761|77|PENDING|356.54|SEK
+            val msg = it.value().toString().split("|")
             logger.info("Message received : $msg")
             try {
                 when (chargeInvoice(msg[0].toInt(), InvoiceStatus.PENDING)) {
                     true -> updateStatus(msg[0].toInt(), InvoiceStatus.PAID)
-                    else -> processRetry(invoiceService.fetch(msg[0].toInt()), InvoiceStatus.FAILED)
+                    else -> processRetry(invoiceService.fetch(msg[0].toInt()))
                 }
             } catch (e: CurrencyMismatchException) {
                 logger.error { "processing message failed with CurrencyMismatchException::$msg[0] " }
@@ -78,65 +79,86 @@ class BillingService(
         }
     }
 
-    private fun processRetry(invoice: Invoice, status: InvoiceStatus) {
+    private fun processRetry(invoice: Invoice) {
         updateStatus(invoice.id, InvoiceStatus.FAILED)
-        logger.info { "sending message for retry $invoice to topic: $MY_RETRY_TOPIC & status : $status" }
+        logger.info { "sending message for retry $invoice to topic: $MY_RETRY_TOPIC & status : ${InvoiceStatus.FAILED}" }
         //Send Msg to new Topic to process Failure status, which will be invoked Separately
         kafkaService.sendMessage(createMsgTxtFromInvoice(invoice),invoice.amount.currency.name, MY_RETRY_TOPIC)
     }
 
     private fun updateStatus(id: Int, status: InvoiceStatus) {
-        rwlock.writeLock().lock()
+        readWriteLock.writeLock().lock()
         try {
             invoiceService.updateInvoice(id, status)
         }catch (e: Exception){
             logger.error { "Error updating invoice status in the database" }
         }finally {
-            rwlock.writeLock().unlock()
+            readWriteLock.writeLock().unlock()
         }
     }
 
     fun chargeInvoice(id: Int, invoiceStatus: InvoiceStatus): Boolean {
-        rwlock.writeLock().lock()
+        readWriteLock.writeLock().lock()
+        var status = false
         try {
-            var status = false
             try {
                 val invoice = invoiceService.fetch(id) //Fetch and check to avoid double charge
                 val customer = customerService.fetch(invoice.customerId)
                 if (invoice.status == invoiceStatus && customer.currency == invoice.amount.currency) {
                     status = paymentProvider.charge(invoice)
                 } else {
-                    // - Fail faster and fail safe, instead of failing at external vendor level
-                    logger.error { "Currency Mismatch with the invoice::$invoice.id for Customer ${customer.id}" }
-                    throw CurrencyMismatchException(invoice.id, customer.id)
-                    //#TODO-Implementation to notify Pleo Production support
+                    if (customer.currency != invoice.amount.currency) {
+                        // - Fail faster and fail safe, instead of failing at external vendor level
+                        logger.error { "Currency Mismatch with the invoice::$invoice.id for Customer ${customer.id}" }
+                        throw CurrencyMismatchException(invoice.id, customer.id)
+                    } else if (invoice.status != invoiceStatus) {
+                        logger.error { "Invoice status from the message and database are different::$invoice.id for Customer ${customer.id}" }
+                    }
                 }
+
                 // - Update Audit table for Auditing Purposes
-                if (status) {
-                    invoiceService.createAudit(id, invoiceStatus, InvoiceStatus.PAID)
-                } else {
-                    invoiceService.createAudit(id, invoiceStatus, InvoiceStatus.FAILED)
-                }
+                createAuditEntry(id, invoiceStatus, status)
+
             } catch (e: InvoiceNotFoundException) {
-                logger.error(e) { "Invoice not found in the database InvoiceId:: ${id}" }
+                logger.error(e) { "Invoice not found in the database InvoiceId:: $id" }
                 return false
             } catch (e: NetworkException) {
-                logger.error(e) { "unable to charge due to network failure for Invoice:: ${id}" }
+                logger.error(e) { "unable to charge due to network failure for Invoice:: $id" }
                 return false
             } catch (e: Exception) {
-                logger.error(e) { "Payment failed for invoice ${id}" }
+                logger.error(e) { "Payment failed for invoice $id" }
                 return false
             }
 
-            logger.info { "Payment status of invoice ${id} is: ${status}" }
+            logger.info { "Payment status of invoice $id is: $status" }
             return status
         }finally {
-            rwlock.writeLock().unlock()
+            readWriteLock.writeLock().unlock()
         }
     }
 
+    private fun createAuditEntry(id: Int, invoiceStatus: InvoiceStatus, status: Boolean) {
+        readWriteLock.writeLock().lock()
+        try {
+            if (status) {
+                invoiceService.createAudit(id, invoiceStatus, InvoiceStatus.PAID)
+            } else {
+                if (invoiceStatus == InvoiceStatus.PENDING) {
+                    invoiceService.createAudit(id, invoiceStatus, InvoiceStatus.FAILED)
+                } else {
+                    invoiceService.createAudit(id, invoiceStatus, InvoiceStatus.RETRY_FAILED)
+                }
+            }
+        } catch (e: Exception) {
+            logger.error { "Error updating invoice status in Audit table" }
+        } finally {
+            readWriteLock.writeLock().unlock()
+        }
+
+    }
+
     fun getPaidInvoices(): MutableList<Any> {
-        var mutableListAny: MutableList<Any> = mutableListOf<Any>()
+        val mutableListAny: MutableList<Any> = mutableListOf()
         Currency.values().sorted().forEach {
             val output: List<Invoice> = invoiceService.fetchPaidInvoices(it)
             output.forEach {
@@ -148,7 +170,7 @@ class BillingService(
     }
 
     fun getFailedInvoices(): MutableList<Any> {
-        var mutableListAny: MutableList<Any> = mutableListOf<Any>()
+        val mutableListAny: MutableList<Any> = mutableListOf()
         Currency.values().sorted().forEach {
             val output : List<Invoice> = invoiceService.fetchFailedInvoices(it)
             output.forEach {
@@ -164,13 +186,12 @@ class BillingService(
         logger.info { "--Retry Mechanism kicked in, processing retry messages--" }
         kafkaService.consumeRetryMessage()?.forEach{
             logger.info("$it")
-            var msg = it.value().toString().split("|")
+            val msg = it.value().toString().split("|")
             //-Message will be in this format -> 761|77|PENDING|356.54|SEK
             logger.info("Message received : $msg")
             when (chargeInvoice(msg[0].toInt(), InvoiceStatus.FAILED)) {
                 true -> updateStatus(msg[0].toInt(), InvoiceStatus.PAID)
                 else -> processFailedRetry(msg[0].toInt())
-
             }
         }
     }
