@@ -99,7 +99,7 @@ Happy hacking 😁!
 
 ## Developer Thoughts Section
 - The initial use case that caught my mind was invoice volumes that we might be fetching from the database
-Thinking this into consideration, I have decided on a solution to fetch PENDING invoices based on the currency.
+taking this into consideration, I have decided on a solution to fetch PENDING invoices based on the currency.
 - A thread pool is created with size based on the currency file and pending invoices are retrieved.
 - I have given a long thought to decide about the way the external payment implementation i was considering the tradeoff 
 between using a REST call and MQ/Apache kafka based system.
@@ -110,3 +110,24 @@ and how the user/Pleo team is going to be intimated about the success /failure o
 - I am thinking of building an Engine based system for the external charging implementation
 - ``Curreny Engine`` - This Engine is going to be responsible for handling of payments happening for that particular currency.
 
+## Coded Design
+
+-> Created a scheduler with Executor service which will trigger on the 1st day of each month.
+
+-> Created another two triggers to Process the invoice and handle the retry mechanism.
+
+-> The process invoice task will fetch the records from the datbase and send to invoice processing consumer.
+
+-> The invoice will be processed with validations checking for currency etc and then if its successful , it will be updated in the database along with this an audit log entry is made.  
+
+`updating Audit table for 911 && status from:PENDING:: to::PAID::`
+
+-> if the payment failed, this will be routed to a retry-invoice queue, where the retry mechanism will be done.
+
+-> If retry succeeds, we will make another entry in audit table indicating the status change,if the payment failed even in the retry the audit entry will be made with new status
+
+`updating Audit table for 911 && status from:FAILED:: to::RETRY_FAILED::`
+
+-> I have decided to skip the retry processing after this, but this will be followed by a notification to PLEO Customer support and the customer about the payment failure.
+
+-> If needed in future we can add a retry mechanism to retry n number of time from a configuration file.
